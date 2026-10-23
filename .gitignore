@@ -31,3 +31,6 @@ Thumbs.db
 *.tmp
 *.bak
 *~
+
+# Local testbench backups
+tb/*_backup.v
