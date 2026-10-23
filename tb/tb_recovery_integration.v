@@ -291,8 +291,8 @@ module tb_recovery_integration;
 
         send_packet(48'hAABBCCDDEEFF);
 
-        repeat (6) @(negedge clk);
-
+        wait (retry_event === 1'b1);
+        #1;
         inject_error = 0;
 
         repeat (12) @(negedge clk);
