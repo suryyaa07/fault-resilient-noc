@@ -9,6 +9,8 @@ module noc_4x4_tb;
     reg [15:0] local_valid = 0;
     reg [16*56-1:0] local_packets = 0;
 
+    wire [15:0] local_ready;
+    reg [15:0] delivered_ready = 16'hFFFF;
     wire [15:0] delivered_valid;
     wire [16*56-1:0] delivered_packets;
 
@@ -17,13 +19,17 @@ module noc_4x4_tb;
     integer cycles;
 
     reg received1, received2;
+    reg accepted_src0, accepted_src2;
+    integer inject_cycles;
 
     noc_4x4 #(.DATA_WIDTH(56)) dut (
         .clk(clk),
         .rst(rst),
         .local_valid(local_valid),
         .local_packets(local_packets),
+        .local_ready(local_ready),
         .delivered_valid(delivered_valid),
+        .delivered_ready(delivered_ready),
         .delivered_packets(delivered_packets)
     );
 
@@ -34,34 +40,49 @@ module noc_4x4_tb;
         input integer dst;
         input [55:0] packet;
         reg found;
+        reg accepted;
+        integer wait_cycles;
         begin
             found = 0;
+            accepted = 0;
+            wait_cycles = 0;
 
             @(negedge clk);
             local_packets[src*56 +: 56] = packet;
             local_valid[src] = 1'b1;
 
-            // Existing mesh injection interface has no local_ready.
+            while ((accepted == 0) && (wait_cycles < 30)) begin
+                @(posedge clk);
+                if (local_ready[src] === 1'b1)
+                    accepted = 1;
+                wait_cycles = wait_cycles + 1;
+            end
+
             @(negedge clk);
             local_valid[src] = 1'b0;
 
-            for (cycles = 0; cycles < 30; cycles = cycles + 1) begin
-                @(negedge clk);
-                if (delivered_valid[dst]) begin
-                    if (delivered_packets[dst*56 +: 56] === packet) begin
-                        $display("PASS: Packet reached router %0d", dst);
-                    end else begin
-                        $display("FAIL: Data mismatch at router %0d", dst);
-                        errors = errors + 1;
-                    end
-                    found = 1;
-                    cycles = 30;
-                end
-            end
-
-            if (!found) begin
-                $display("FAIL: No packet received at router %0d", dst);
+            if (!accepted) begin
+                $display("FAIL: Source router %0d did not accept packet", src);
                 errors = errors + 1;
+            end else begin
+                for (cycles = 0; cycles < 30; cycles = cycles + 1) begin
+                    @(negedge clk);
+                    if (delivered_valid[dst] && delivered_ready[dst]) begin
+                        if (delivered_packets[dst*56 +: 56] === packet)
+                            $display("PASS: Packet reached router %0d", dst);
+                        else begin
+                            $display("FAIL: Data mismatch at router %0d", dst);
+                            errors = errors + 1;
+                        end
+                        found = 1;
+                        cycles = 30;
+                    end
+                end
+
+                if (!found) begin
+                    $display("FAIL: No packet received at router %0d", dst);
+                    errors = errors + 1;
+                end
             end
 
             repeat (2) @(negedge clk);
@@ -82,17 +103,37 @@ module noc_4x4_tb;
         send_and_check(0, 10, packet1);
         send_and_check(2, 3, packet2);
 
-        // Send two packets from different sources without waiting
-        // between injections. Both should reach their destinations.
+        // Inject concurrently and hold each valid until its handshake.
+        accepted_src0 = 0;
+        accepted_src2 = 0;
+        inject_cycles = 0;
+
         @(negedge clk);
         local_packets[0*56 +: 56] = packet3;
         local_packets[2*56 +: 56] = packet2;
         local_valid[0] = 1'b1;
         local_valid[2] = 1'b1;
 
-        @(negedge clk);
+        while ((!accepted_src0 || !accepted_src2) && inject_cycles < 30) begin
+            @(posedge clk);
+            if (!accepted_src0 && local_ready[0] === 1'b1)
+                accepted_src0 = 1;
+            if (!accepted_src2 && local_ready[2] === 1'b1)
+                accepted_src2 = 1;
+
+            inject_cycles = inject_cycles + 1;
+            @(negedge clk);
+            if (accepted_src0) local_valid[0] = 1'b0;
+            if (accepted_src2) local_valid[2] = 1'b0;
+        end
+
         local_valid[0] = 1'b0;
         local_valid[2] = 1'b0;
+
+        if (!accepted_src0 || !accepted_src2) begin
+            $display("FAIL: Concurrent injection handshake timed out");
+            errors = errors + 1;
+        end
 
         received1 = 0;
         received2 = 0;

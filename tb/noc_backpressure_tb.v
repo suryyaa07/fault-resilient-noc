@@ -9,11 +9,13 @@ module noc_backpressure_tb;
     reg [15:0] local_valid;
     reg [16*56-1:0] local_packets;
 
+    wire [15:0] local_ready;
+    reg [15:0] delivered_ready;
     wire [15:0] delivered_valid;
     wire [16*56-1:0] delivered_packets;
 
     wire local0_ready;
-    assign local0_ready = dut.ready_in[0][4];
+    assign local0_ready = local_ready[0];
 
     reg [55:0] packets [0:7];
     reg [7:0] received;
@@ -32,7 +34,9 @@ module noc_backpressure_tb;
         .rst(rst),
         .local_valid(local_valid),
         .local_packets(local_packets),
+        .local_ready(local_ready),
         .delivered_valid(delivered_valid),
+        .delivered_ready(delivered_ready),
         .delivered_packets(delivered_packets)
     );
 
@@ -40,7 +44,7 @@ module noc_backpressure_tb;
 
     // Monitor packet delivery to router 15.
     always @(posedge clk) begin
-        if (!rst && delivered_valid[15] === 1'b1) begin
+        if (!rst && delivered_valid[15] === 1'b1 && delivered_ready[15] === 1'b1) begin
             $display("Delivery observed at time %0t: %h",
                      $time, delivered_packets[15*56 +: 56]);
 
@@ -67,6 +71,7 @@ module noc_backpressure_tb;
         rst = 1'b1;
         local_valid = 16'b0;
         local_packets = {(16*56){1'b0}};
+        delivered_ready = 16'hFFFF;
 
         received = 8'b0;
         received_count = 0;
