@@ -41,3 +41,6 @@ tb/*_backup.v
 # Local Adwaith simulation and generated results
 /sim_adwaith/
 /results/
+
+# Local integration simulation workspace
+/sim_integration/
