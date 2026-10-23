@@ -1,33 +1,7 @@
-# Vivado generated files
+# Vivado simulation outputs
+xsim.dir/
 *.jou
 *.log
-*.str
-*.wdb
-*.wcfg
 *.pb
-
-# Vivado generated directories
-*.cache/
-*.runs/
-*.sim/
-*.gen/
-*.hw/
-*.ip_user_files/
-.Xil/
-
-# Local Vivado project (can be recreated)
-NoC_Recovery_Test/
-
-# Python caches
-__pycache__/
-*.pyc
-
-# Editor and operating-system files
-.vscode/
-.DS_Store
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.bak
-*~
+webtalk*.jou
+webtalk*.log
