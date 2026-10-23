@@ -34,3 +34,6 @@ Thumbs.db
 
 # Local testbench backups
 tb/*_backup.v
+
+# Local Rahul simulation workspace
+/sim_rahul/
