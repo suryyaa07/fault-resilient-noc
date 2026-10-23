@@ -47,14 +47,15 @@ module mesh_bfs_fault_tb;
                 link_up_map[r*4 + 3] = 1'b1;
         end
 
-        // Test 1: Baseline route should start SOUTH.
+                // Test 1: Baseline route should start EAST.
+        // With equal link costs, deterministic tie-breaking selects EAST.
         #2;
-        if (route_valid !== 1'b1 || next_port !== SOUTH) begin
+        if (route_valid !== 1'b1 || next_port !== EAST) begin
             $display("FAIL: Baseline route, port=%0d valid=%b",
                      next_port, route_valid);
             failures = failures + 1;
         end else begin
-            $display("PASS: Baseline route starts SOUTH");
+            $display("PASS: Baseline route starts EAST");
         end
 
         // Test 2: Disable physical link R0 <-> R4.

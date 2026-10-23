@@ -49,34 +49,26 @@ initial begin
                 link_up_map[r*4+WEST] = 1'b1;
         end
 
-// Test 1: Make the SOUTH route expensive at R0 and R4.
-        // EAST remains uncongested, so the selected first hop
-        // should be EAST.
-        congestion_map[0*8+1*2 +: 2] = 2'd3;
-        congestion_map[4*8+0*2 +: 2] = 2'd3;
-
+        // Test 1: With zero congestion, the equal-cost tie selects EAST.
         #2;
-
-if (route_valid === 1'b1 && next_port === EAST) begin
-            $display("PASS: Congestion-aware route selects EAST");
-        end
-        else begin
-            $display("FAIL: Congestion test, port=%0d valid=%b",
+        if (route_valid === 1'b1 && next_port === EAST) begin
+            $display("PASS: Zero congestion selects EAST");
+        end else begin
+            $display("FAIL: Zero-congestion baseline, port=%0d valid=%b",
                      next_port, route_valid);
             failures = failures + 1;
         end
 
-// Test 2: Disable the EAST link at both endpoints.
-        link_up_map[0*4+EAST] = 1'b0;
-        link_up_map[1*4+WEST] = 1'b0;
+        // Test 2: Make the EAST link R0 <-> R1 highly congested.
+        // The alternate SOUTH route should now be cheaper.
+        congestion_map[0*8 + EAST*2 +: 2] = 2'd3;
+        congestion_map[1*8 + WEST*2 +: 2] = 2'd3;
 
         #2;
-
-if (route_valid === 1'b1 && next_port !== EAST) begin
-            $display("PASS: Disabled link excluded from route");
-        end
-        else begin
-            $display("FAIL: Failed-link exclusion, port=%0d valid=%b",
+        if (route_valid === 1'b1 && next_port === SOUTH) begin
+            $display("PASS: Congestion changes route to SOUTH");
+        end else begin
+            $display("FAIL: Congestion rerouting, port=%0d valid=%b",
                      next_port, route_valid);
             failures = failures + 1;
         end

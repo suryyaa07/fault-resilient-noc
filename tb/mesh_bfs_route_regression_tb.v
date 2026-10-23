@@ -52,9 +52,10 @@ module mesh_bfs_route_regression_tb;
 
         #2;
 
-        // Test 1: healthy mesh.
-        if (route_valid === 1'b1 && next_port === SOUTH) begin
-            $display("PASS: Healthy mesh route starts SOUTH");
+                // Test 1: healthy mesh.
+        // With equal link costs, deterministic tie-breaking selects EAST.
+        if (route_valid === 1'b1 && next_port === EAST) begin
+            $display("PASS: Healthy mesh route starts EAST");
         end else begin
             $display("FAIL: Healthy mesh route");
             failures = failures + 1;
