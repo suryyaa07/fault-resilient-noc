@@ -37,3 +37,7 @@ tb/*_backup.v
 
 # Local Rahul simulation workspace
 /sim_rahul/
+
+# Local Adwaith simulation and generated results
+/sim_adwaith/
+/results/
