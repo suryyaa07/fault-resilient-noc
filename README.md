@@ -235,6 +235,27 @@ The following Vivado XSim waveform captures the NoC simulation and demonstrates 
 
 ![NoC Simulation Waveform](docs/images/noc_simulation.png)
 
+### Interactive NoC Demonstration
+
+The project includes a Python-based graphical demonstration tool (`noc_demo_gui.py`) for visualising packet movement and fault-aware routing in the 4×4 mesh Network-on-Chip.
+
+The GUI allows users to:
+
+- Select a source router and destination router.
+- Introduce a fault into a network link.
+- Visualise packet movement across the mesh.
+- Observe the routing decisions and the corresponding decision trace alongside the packet movement.
+- Understand how the selected route changes when a link failure is introduced.
+
+This provides an interactive demonstration of packet-level communication and fault-aware routing behaviour.
+
+**Launch the demonstration:**
+
+```bash
+python noc_demo_gui.py
+```
+
+
 ## 7. Repository Structure
 
 ```text
