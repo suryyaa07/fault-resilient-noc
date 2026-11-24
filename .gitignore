@@ -44,3 +44,24 @@ tb/*_backup.v
 
 # Local integration simulation workspace
 /sim_integration/
+
+# Local timestamped source backups
+*.before_*
+
+# Vivado and XSim generated files
+xsim.dir/
+waveform_work/
+.Xil/
+*.wdb
+*.jou
+*.str
+*.vcd
+*.vpd
+*.dmp
+
+# Vivado generated project directories
+.cache/
+.runs/
+.hw/
+.sim/
+.ip_user_files/
