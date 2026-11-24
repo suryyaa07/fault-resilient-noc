@@ -2,11 +2,18 @@
 `timescale 1ns/1ps
 
 module router_5port #(
+
     parameter DATA_WIDTH = 56,
-    parameter ROUTER_ID  = 0
+    parameter ROUTER_ID  = 0,
+    parameter ADAPTIVE_ROUTING = 0
+
 )(
+
     input wire clk,
     input wire rst,
+    input wire adaptive_enable,
+    input wire [63:0] link_up_map,
+    input wire [127:0] congestion_map,
 
     input wire [DATA_WIDTH-1:0] north_in,
     input wire [DATA_WIDTH-1:0] south_in,
@@ -25,6 +32,7 @@ module router_5port #(
 
     output reg [4:0] out_valid,
     input wire [4:0] out_ready
+
 );
 
     wire [DATA_WIDTH-1:0] inputs [0:4];
@@ -40,12 +48,33 @@ module router_5port #(
     reg [4:0] selected_out;
     wire [4:0] grant;
     wire advance;
+    wire [2:0] adaptive_port;
+    wire adaptive_route_valid;
+    wire adaptive_destination_reached;
 
     assign inputs[0] = north_in;
     assign inputs[1] = south_in;
     assign inputs[2] = east_in;
     assign inputs[3] = west_in;
     assign inputs[4] = local_in;
+
+    generate
+        if (ADAPTIVE_ROUTING != 0) begin : ADAPTIVE_ROUTER_ROUTE
+            mesh_bfs_route route_inst (
+                .current_router(ROUTER_ID),
+                .dest_router(selected_packet[51:48]),
+                .link_up_map(link_up_map),
+                .congestion_map(congestion_map),
+                .next_port(adaptive_port),
+                .route_valid(adaptive_route_valid),
+                .destination_reached(adaptive_destination_reached)
+            );
+        end else begin : FIXED_ROUTER_ROUTE
+            assign adaptive_port = 3'd4;
+            assign adaptive_route_valid = 1'b0;
+            assign adaptive_destination_reached = 1'b0;
+        end
+    endgenerate
 
     genvar p;
     generate
@@ -91,16 +120,29 @@ module router_5port #(
         selected_out = 5'b00000;
 
         if (|grant) begin
-            if (dest_x > here_x)
-                selected_out[2] = 1'b1;
-            else if (dest_x < here_x)
-                selected_out[3] = 1'b1;
-            else if (dest_y > here_y)
-                selected_out[1] = 1'b1;
-            else if (dest_y < here_y)
-                selected_out[0] = 1'b1;
-            else
-                selected_out[4] = 1'b1;
+            if ((ADAPTIVE_ROUTING != 0) && (adaptive_enable == 1'b1)) begin
+                if (adaptive_route_valid) begin
+                    case (adaptive_port)
+                        3'd0: selected_out[0] = 1'b1;
+                        3'd1: selected_out[1] = 1'b1;
+                        3'd2: selected_out[2] = 1'b1;
+                        3'd3: selected_out[3] = 1'b1;
+                        3'd4: selected_out[4] = 1'b1;
+                        default: selected_out = 5'b00000;
+                    endcase
+                end
+            end else begin
+                if (dest_x > here_x)
+                    selected_out[2] = 1'b1;
+                else if (dest_x < here_x)
+                    selected_out[3] = 1'b1;
+                else if (dest_y > here_y)
+                    selected_out[1] = 1'b1;
+                else if (dest_y < here_y)
+                    selected_out[0] = 1'b1;
+                else
+                    selected_out[4] = 1'b1;
+            end
         end
 
         north_out = 0;
