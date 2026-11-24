@@ -229,6 +229,11 @@ PowerShell test runners are provided:
 The scripts may require adjustment for a different Vivado installation. Check their configured paths and branch requirements before execution.
 
 The Python visualisation application is provided in `noc_demo_gui.py`.
+### Simulation Evidence
+
+The following Vivado XSim waveform captures the NoC simulation and demonstrates packet-level activity during verification.
+
+![NoC Simulation Waveform](docs/images/noc_simulation.png)
 
 ## 7. Repository Structure
 
