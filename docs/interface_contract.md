@@ -1,8 +1,8 @@
-
+﻿
 # Fault-Resilient 4x4 Mesh NoC
-## Hardware Interface Contract — Draft v0.1
+## Hardware Interface Contract - Draft v0.1
 
-Status: DRAFT — pending team approval  
+Status: DRAFT - pending team approval  
 Integration branch: integration/system
 
 ## 1. System Overview
@@ -14,13 +14,13 @@ The design targets a 4x4 mesh Network-on-Chip with:
 - CRC-8 packet integrity checking
 - ACK/NACK-based retransmission
 - Link-health monitoring and quarantine
-- Fault-aware BFS rerouting
+- Fault-aware adaptive routing using weighted Dijkstra
 - Probe-based link recovery
 
 A complete mesh contains 16 routers and 24 undirected
 neighbor connections, equivalent to 48 directed channels.
 
-## 2. Packet Format — Implemented
+## 2. Packet Format - Implemented
 
 Packet width: 56 bits
 
@@ -43,7 +43,7 @@ Packet IDs must not be reused while an older packet with
 the same source and packet ID can still be retransmitted
 or duplicated.
 
-## 3. Router Port Numbering — Implemented
+## 3. Router Port Numbering - Implemented
 
 | Port number | Direction |
 |---|---|
@@ -63,7 +63,7 @@ Y increases southward.
 
 Valid router IDs: 0 through 15.
 
-## 4. Ready/Valid Handshake — Integration Tested
+## 4. Ready/Valid Handshake - Integration Tested
 
 A transfer occurs on a rising clock edge when:
 
@@ -79,7 +79,7 @@ valid is asserted.
 Reset is named `rst` and is active high in the
 currently implemented modules.
 
-## 5. Receiver-to-Router Interface — Integration Tested
+## 5. Receiver-to-Router Interface - Integration Tested
 
 Module: link_rx_wrapper
 
@@ -118,6 +118,10 @@ Parameters:
 
     DATA_WIDTH = 56
     ROUTER_ID = 0
+    ADAPTIVE_ROUTING = 0
+
+The router has five input channels and five output channels:
+North, South, East, West and Local.
 
 Inputs:
 
@@ -139,16 +143,26 @@ Outputs:
     in_ready[4:0]
     out_valid[4:0]
 
-The current implementation uses deterministic XY
-routing, input FIFOs, and arbitration.
+The router supports input FIFOs, arbitration, deterministic XY routing
+and optional adaptive routing.
 
-Its output FIFO-pop control depends on the granted
-input and the selected output's readiness.
+The adaptive-routing interface includes:
 
-The existing router does NOT expose a BFS next-hop
-selection interface.
+    adaptive_enable
+    link_up_map[63:0]
+    congestion_map[127:0]
 
-## 7. Link Health Interface — Unit Tested
+When ADAPTIVE_ROUTING is enabled and adaptive_enable is asserted,
+the router uses the route selected by mesh_bfs_route.
+
+When adaptive routing is disabled or adaptive_enable is deasserted,
+the router uses deterministic XY routing.
+
+If adaptive routing is enabled but no valid route is available,
+the router does not fall back to XY routing.
+
+The FIFO depth used by the current router implementation is 4.
+## 7. Link Health Interface - Unit Tested
 
 Module: link_health_manager
 
@@ -176,44 +190,55 @@ The thresholds are parameterized.
 Each directed channel must have an explicitly defined
 health status and corresponding routing availability.
 
-## 8. BFS Integration — NOT YET IMPLEMENTED
+## 8. Adaptive Routing Interface — Implemented
 
-The BFS manager must provide a next-hop decision for
-a specified source/current router and destination,
-accounting for unavailable connections.
+RTL module: mesh_bfs_route
 
-A proposed interface is:
+Source file: rtl/routing/mesh_bfs_route.v
 
-    route_request
-    current_router_id[3:0]
-    destination_router_id[3:0]
-    next_hop_valid
-    next_hop_port[2:0]
-    route_unavailable
+Despite the historical filename, the current implementation uses
+a weighted Dijkstra shortest-path algorithm, not BFS.
 
-This is a PROPOSAL, not an existing module interface.
+Inputs:
 
-Proposed next-hop encodings:
+    current_router
+    dest_router
+    link_up_map
+    congestion_map
 
-    0 = North
-    1 = South
-    2 = East
-    3 = West
-    4 = Local
+Outputs:
 
-Before implementation, Rahul and Adwaith must agree on:
+    next_port
+    route_valid
+    destination_reached
 
-1. The actual BFS RTL module interface.
-2. Whether routing is combinational or multi-cycle.
-3. How router arbitration waits for a route result.
-4. How route requests and results are associated.
-5. How route availability updates are distributed.
-6. How local-link quarantine affects output selection.
-7. How no-route conditions are handled.
-8. How deadlock and livelock risks are addressed.
+The algorithm considers available links and endpoint congestion
+when calculating a minimum-cost path.
 
-The router must not forward using a stale BFS decision.
+The link cost is:
 
+    1 + 2 * max(endpoint congestion scores)
+
+The current router integration works as follows:
+
+1. router_5port instantiates mesh_bfs_route when
+   ADAPTIVE_ROUTING is enabled.
+2. adaptive_enable selects adaptive routing instead of XY routing.
+3. The 4x4 mesh instantiates routers with ADAPTIVE_ROUTING enabled.
+4. The mesh passes its generated link-availability map to each router.
+5. Configured fault injection can disable an adjacent mesh connection
+   and allow the routing algorithm to select an alternative path.
+
+The mesh currently supplies an all-zero congestion map.
+Therefore, the routing module accepts congestion information, but
+live congestion-aware routing is not active at the mesh level.
+
+The mesh fault-injection mechanism is separate from the
+link_health_manager. Quarantine status from the link-health manager
+is not yet automatically connected to the mesh link-availability map.
+
+The algorithm's shortest-path calculation does not, by itself,
+guarantee deadlock freedom or livelock freedom.
 ## 9. Retransmission and ACK/NACK Limitations
 
 The current protected-link recovery implements bounded
@@ -234,28 +259,34 @@ claimed by the current implementation.
 
 ## 10. Verification Status
 
-Completed local tests:
+The repository contains testbenches covering the following areas:
 
-- Recovery module unit tests
-- Receiver wrapper verification
-- Protected-link verification
-- Recovery-to-router integration:
-  - Clean packet delivery
-  - CRC corruption and retry
-  - Lost ACK and duplicate suppression
-  - Router output backpressure
+- CRC-8 generation and checking
+- Link-health state transitions and probe-based recovery
+- Retransmission, timeout and retry exhaustion
+- Protected-link and receiver-wrapper behaviour
+- Recovery-to-router integration and backpressure
+- Router FIFO and contention behaviour
+- 4x4 mesh traffic and stress scenarios
+- Adaptive routing, congestion inputs and fault-aware rerouting
 
-Outstanding system tests:
+The routing test suite includes checks for:
 
-- Multi-input router contention and fairness
-- FIFO saturation and sustained backpressure
-- BFS next-hop interface integration
-- Alternative routing around quarantined links
-- Full 4x4 mesh connectivity
-- Simultaneous traffic and faults
-- Deadlock/livelock analysis
-- End-to-end delivery and recovery metrics
+- Minimum-cost path selection
+- Congestion-dependent route selection
+- Disconnected networks and NO_ROUTE conditions
+- Local-destination handling
+- Fault-aware route selection
 
+Previously executed routing verification reported passing congestion and standalone routing tests. Individual test results should not be interpreted as proof of complete end-to-end mesh correctness.
+
+Remaining verification and integration work:
+
+- Connect live congestion measurements to the mesh routing inputs.
+- Connect link-health quarantine status to the mesh link-availability map.
+- Verify simultaneous traffic with multiple concurrent link failures.
+- Analyse deadlock and livelock behaviour.
+- Measure end-to-end packet delivery, latency, throughput and recovery performance.
 ## 11. Team Ownership
 
 Recovery RTL and protected-link behavior:
@@ -290,3 +321,5 @@ merging into the main branch.
 - [ ] Team agrees on per-directed-link health mapping.
 - [ ] Team agrees on deadlock-handling strategy.
 - [ ] Team approves the final integration interface.
+
+
