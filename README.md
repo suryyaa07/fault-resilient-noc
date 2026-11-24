@@ -73,6 +73,11 @@ The X coordinate increases eastward and the Y coordinate increases southward.
 | Adaptive routing module | Weighted shortest-path route selection |
 
 ## 4. Implementation Workflow
+### System Workflow
+
+The following flowchart illustrates the packet transmission process, including CRC verification, acknowledgement handling, retransmission and link recovery.
+
+![NoC System Workflow](docs/images/flowchart.jpeg)
 
 ### 1. Packet Generation and Injection
 
